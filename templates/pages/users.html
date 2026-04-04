@@ -1,0 +1,172 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinanceOS — Users</title>
+
+<link rel="stylesheet" href="{% static 'css/base.css' %}">
+
+<style>
+.users-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 14px;
+}
+.user-tile {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 22px;
+  transition: border-color 0.2s, transform 0.2s;
+}
+.user-tile:hover { border-color: var(--border2); transform: translateY(-2px); }
+
+.tile-top { display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+.tile-avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--purple), var(--blue2));
+  display: flex; align-items:center; justify-content:center;
+  font-family: var(--font-head); font-weight: 700; font-size: 16px; color: #fff;
+  flex-shrink: 0;
+}
+.tile-name   { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+.tile-email  { font-size: 12px; color: var(--text3); }
+.tile-bottom { display:flex; align-items:center; justify-content:space-between; }
+.tile-status { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text2); }
+.tile-actions{ display:flex; gap:6px; align-items:center; }
+</style>
+</head>
+<body>
+<div id="toast-container"></div>
+
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-area">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+
+      <!-- Guard: non-admin sees lock screen -->
+      <div id="guard-msg" class="hidden">
+        <div class="empty-state" style="padding-top:80px">
+          <div class="empty-icon">🔒</div>
+          <div class="empty-title">Admin access required</div>
+          <div class="empty-sub">Only administrators can manage users</div>
+        </div>
+      </div>
+
+      <!-- Count + grid -->
+      <div id="users-wrap">
+        <p style="font-size:12px;color:var(--text3);margin-bottom:16px" id="user-count">Loading…</p>
+        <div class="users-grid" id="users-grid">
+          ${[1,2,3].map(()=>`<div class="user-tile"><div class="skeleton" style="height:66px"></div></div>`).join('')}
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Edit user modal -->
+<div class="modal-overlay" id="user-modal" style="display:none">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-uname">Edit User</div>
+      <button class="modal-close" onclick="closeModal('user-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-uid">
+      <div class="form-group">
+        <label class="form-label">Role</label>
+        <select class="form-select" id="edit-role">
+          <option value="viewer">Viewer</option>
+          <option value="analyst">Analyst</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Account Status</label>
+        <select class="form-select" id="edit-status">
+          <option value="true">Active</option>
+          <option value="false">Inactive</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('user-modal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveUser()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script>
+if (!Auth.requireAuth()) throw '';
+
+buildSidebar('users');
+buildTopbar('User Management');
+
+if (!Auth.isAdmin()) {
+  document.getElementById('guard-msg').classList.remove('hidden');
+  document.getElementById('users-wrap').classList.add('hidden');
+} else {
+  loadUsers();
+}
+
+async function loadUsers() {
+  try {
+    const data  = await API.get('/users/');
+    const users = Array.isArray(data) ? data : (data.results || []);
+    document.getElementById('user-count').textContent = `${users.length} registered users`;
+    document.getElementById('users-grid').innerHTML = users.map(u => `
+      <div class="user-tile fade-up">
+        <div class="tile-top">
+          <div class="tile-avatar">${getInitials(u.username)}</div>
+          <div>
+            <div class="tile-name">${u.username}</div>
+            <div class="tile-email">${u.email || 'no email set'}</div>
+          </div>
+        </div>
+        <div class="tile-bottom">
+          <div class="tile-status">
+            <span class="status-dot ${u.is_active?'status-active':'status-inactive'}"></span>
+            ${u.is_active ? 'Active' : 'Inactive'}
+          </div>
+          <div class="tile-actions">
+            <span class="badge badge-${u.role}">${u.role}</span>
+            <button class="btn-icon" onclick="openEdit('${u.id}','${u.username}','${u.role}',${u.is_active})"
+                    title="Edit user">${iconEdit()}</button>
+          </div>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    console.error(e); toast('Failed to load users', 'error');
+  }
+}
+
+function openEdit(id, username, role, isActive) {
+  document.getElementById('edit-uid').value   = id;
+  document.getElementById('edit-role').value  = role;
+  document.getElementById('edit-status').value = String(isActive);
+  document.getElementById('modal-uname').textContent = `Edit — ${username}`;
+  openModal('user-modal');
+}
+
+async function saveUser() {
+  const id = document.getElementById('edit-uid').value;
+  const body = {
+    role:      document.getElementById('edit-role').value,
+    is_active: document.getElementById('edit-status').value === 'true',
+  };
+  try {
+    await API.patch(`/users/${id}/`, body);
+    toast('User updated successfully', 'success');
+    closeModal('user-modal');
+    loadUsers();
+  } catch(e) {
+    toast(e.error || 'Failed to update user', 'error');
+  }
+}
+</script>
+</body>
+</html>

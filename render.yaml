@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: financeos
+    env: python
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn finance_dashboard.wsgi:application"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: DEBUG
+        value: "False"

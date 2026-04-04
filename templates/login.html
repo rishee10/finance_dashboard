@@ -1,0 +1,250 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinanceOS — Sign In</title>
+<!-- <link rel="stylesheet" href="../css/base.css"> -->
+<!-- <link rel="stylesheet" href="/static/css/base.css"> -->
+
+<link rel="stylesheet" href="{% static 'css/base.css' %}">
+
+<style>
+/* Login-specific styles */
+body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+
+/* Animated background grid */
+.bg-grid {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    linear-gradient(rgba(94,234,212,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(94,234,212,0.025) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 90% 90% at 50% 50%, black 0%, transparent 100%);
+}
+
+/* Ambient glow */
+.bg-glow {
+  position: fixed; pointer-events: none; z-index: 0;
+  width: 700px; height: 700px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(94,234,212,0.05) 0%, transparent 65%);
+  top: 50%; left: 50%; transform: translate(-50%, -55%);
+}
+
+/* Card */
+.auth-card {
+  position: relative; z-index: 1;
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 22px;
+  padding: 44px 40px;
+  width: 100%; max-width: 420px;
+  box-shadow: 0 0 0 1px rgba(94,234,212,0.06), var(--shadow-lg);
+  animation: fadeUp 0.5s ease both;
+}
+
+/* Logo */
+.auth-logo {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 10px;
+}
+.auth-logo-icon {
+  width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--green2), var(--blue2));
+  display: flex; align-items: center; justify-content: center; font-size: 20px;
+}
+.auth-logo-name {
+  font-family: var(--font-head); font-weight: 700; font-size: 22px; letter-spacing: -0.5px;
+}
+.auth-logo-name span { color: var(--green); }
+
+.auth-tagline { font-size: 13px; color: var(--text3); margin-bottom: 32px; }
+
+/* Tabs */
+.tabs {
+  display: flex; gap: 4px;
+  background: var(--bg3); border-radius: var(--radius-sm); padding: 4px;
+  margin-bottom: 26px;
+}
+.tab {
+  flex: 1; padding: 9px; border: none; background: transparent;
+  color: var(--text2); font-family: var(--font-body); font-size: 14px; font-weight: 500;
+  border-radius: 6px; cursor: pointer; transition: all 0.2s;
+}
+.tab.active {
+  background: var(--bg4); color: var(--text);
+  box-shadow: 0 1px 6px rgba(0,0,0,0.35);
+}
+
+/* Error box */
+.error-box {
+  background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.25);
+  border-radius: var(--radius-sm); padding: 11px 14px;
+  font-size: 13px; color: var(--red); margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+/* Submit spinner */
+.btn-spinner {
+  width: 14px; height: 14px; border: 2px solid rgba(0,0,0,0.3);
+  border-top-color: #000; border-radius: 50%;
+  animation: spin 0.7s linear infinite; display: none;
+}
+
+/* Footer link */
+.auth-footer { margin-top: 22px; text-align: center; font-size: 13px; color: var(--text3); }
+.auth-footer a { color: var(--green); text-decoration: none; font-weight: 500; }
+.auth-footer a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+<div id="toast-container"></div>
+
+<div class="auth-card">
+  <div class="auth-logo">
+    <div class="auth-logo-icon">◈</div>
+    <div class="auth-logo-name">Finance<span>OS</span></div>
+  </div>
+  <p class="auth-tagline">Role-based financial management system</p>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('login')">Sign In</button>
+    <button class="tab" onclick="showTab('register')">Register</button>
+  </div>
+
+  <div id="error-box" class="error-box hidden"></div>
+
+  <!-- ── Login Form ─────────────────────────────────────────── -->
+  <div id="login-form">
+    <div class="form-group">
+      <label class="form-label">Username</label>
+      <input type="text" class="form-input" id="login-username"
+             placeholder="your_username" autocomplete="username">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Password</label>
+      <input type="password" class="form-input" id="login-password"
+             placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn btn-primary btn-full btn-lg" id="login-btn" onclick="doLogin()">
+      <div class="btn-spinner" id="login-spinner"></div>
+      Sign In
+    </button>
+  </div>
+
+  <!-- ── Register Form ──────────────────────────────────────── -->
+  <div id="register-form" class="hidden">
+    <div class="form-group">
+      <label class="form-label">Username</label>
+      <input type="text" class="form-input" id="reg-username" placeholder="choose_a_username">
+    </div>
+    <div class="form-group">
+      <label class="form-label">Email</label>
+      <input type="email" class="form-input" id="reg-email" placeholder="you@example.com">
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="form-group">
+        <label class="form-label">Password</label>
+        <input type="password" class="form-input" id="reg-password" placeholder="min 8 chars">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Confirm</label>
+        <input type="password" class="form-input" id="reg-password2" placeholder="repeat">
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Role</label>
+      <select class="form-select" id="reg-role">
+        <option value="viewer">Viewer — Read only</option>
+        <option value="analyst">Analyst — View + Analytics</option>
+        <option value="admin">Admin — Full access</option>
+      </select>
+      <p class="form-hint">In production, only admins can assign roles.</p>
+    </div>
+    <button class="btn btn-primary btn-full btn-lg" onclick="doRegister()">
+      Create Account
+    </button>
+  </div>
+
+  <div class="auth-footer">
+    Having trouble? <a href="mailto:admin@example.com">Contact admin</a>
+  </div>
+</div>
+
+
+<script src="/static/js/api.js"></script>
+<script>
+// Redirect if already logged in
+Auth.redirectIfLoggedIn();
+
+function showTab(tab) {
+  document.querySelectorAll('.tab').forEach((t, i) =>
+    t.classList.toggle('active', (tab === 'login' && i === 0) || (tab === 'register' && i === 1))
+  );
+  document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
+  document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
+  document.getElementById('error-box').classList.add('hidden');
+}
+
+function showError(msg) {
+  const box = document.getElementById('error-box');
+  box.textContent = msg;
+  box.classList.remove('hidden');
+}
+
+async function doLogin() {
+  const btn     = document.getElementById('login-btn');
+  const spinner = document.getElementById('login-spinner');
+  btn.disabled = true;
+  spinner.style.display = 'block';
+  document.getElementById('error-box').classList.add('hidden');
+
+  try {
+    const data = await API.post('/auth/login/', {
+      username: document.getElementById('login-username').value.trim(),
+      password: document.getElementById('login-password').value,
+    });
+    if (!data) return;
+    Auth.setSession(data);
+    window.location.href = 'pages/dashboard.html';
+  } catch (e) {
+    showError(e.error || e.detail || 'Login failed. Check your credentials.');
+  } finally {
+    btn.disabled = false;
+    spinner.style.display = 'none';
+  }
+}
+
+async function doRegister() {
+  try {
+    const data = await API.post('/auth/register/', {
+      username:  document.getElementById('reg-username').value.trim(),
+      email:     document.getElementById('reg-email').value.trim(),
+      password:  document.getElementById('reg-password').value,
+      password2: document.getElementById('reg-password2').value,
+      role:      document.getElementById('reg-role').value,
+    });
+    if (!data) return;
+    Auth.setSession(data);
+    toast('Account created! Welcome.', 'success');
+    setTimeout(() => window.location.href = 'pages/dashboard.html', 800);
+  } catch (e) {
+    const msg = Object.values(e).flat().join(' ');
+    showError(msg || 'Registration failed.');
+  }
+}
+
+// Enter key
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    if (!document.getElementById('login-form').classList.contains('hidden')) doLogin();
+  }
+});
+</script>
+</body>
+</html>

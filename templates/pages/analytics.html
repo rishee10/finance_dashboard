@@ -1,0 +1,231 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinanceOS — Analytics</title>
+<!-- <link rel="stylesheet" href="../css/base.css"> -->
+<!-- <link rel="stylesheet" href="/static/css/base.css"> -->
+
+<link rel="stylesheet" href="{% static 'css/base.css' %}">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+.charts-2col { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+.charts-1col { margin-bottom:16px; }
+@media(max-width:900px) { .charts-2col { grid-template-columns:1fr; } }
+
+.chart-card {
+  background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius);
+}
+.chart-header { padding:18px 22px 0; margin-bottom:16px; }
+.chart-title  { font-family:var(--font-head); font-size:14px; font-weight:600; margin-bottom:3px; }
+.chart-sub    { font-size:11px; color:var(--text3); }
+.chart-body   { padding:0 20px 20px; }
+.chart-wrap   { position:relative; height:230px; }
+.chart-wrap-sm{ position:relative; height:190px; }
+
+.summary-row {
+  display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px;
+}
+.summary-item {
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:var(--radius-sm); padding:16px 18px; text-align:center;
+}
+.summary-item .val { font-family:var(--font-mono); font-size:22px; margin-bottom:4px; }
+.summary-item .lbl { font-size:11px; text-transform:uppercase; letter-spacing:0.07em; color:var(--text3); }
+</style>
+</head>
+<body>
+<div id="toast-container"></div>
+
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-area">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content" id="page-main">
+      <div style="padding:60px;text-align:center;color:var(--text3)">Loading analytics…</div>
+    </main>
+  </div>
+</div>
+
+<!-- <script src="../js/api.js"></script> -->
+<script src="/static/js/api.js"></script>
+<script>
+if (!Auth.requireAuth()) throw '';
+if (!Auth.isAnalyst()) {
+  document.getElementById('page-main').innerHTML = `
+    <div class="empty-state" style="padding-top:80px">
+      <div class="empty-icon">🔒</div>
+      <div class="empty-title">Analyst access required</div>
+      <div class="empty-sub">This page is only accessible to Analysts and Admins</div>
+    </div>`;
+} else {
+  buildSidebar('analytics');
+  buildTopbar('Analytics');
+  loadAnalytics();
+}
+
+const charts = {};
+
+async function loadAnalytics() {
+  try {
+    const data = await API.get('/records/', { page_size: 1000 });
+    const all  = data.results || [];
+
+    const income  = all.filter(r=>r.entry_type==='income').reduce((s,r)=>s+ +r.amount,0);
+    const expense = all.filter(r=>r.entry_type==='expense').reduce((s,r)=>s+ +r.amount,0);
+    const balance = income - expense;
+    const savingsRate = income > 0 ? ((income-expense)/income*100).toFixed(1) : '0.0';
+
+    document.getElementById('page-main').innerHTML = `
+      <!-- KPI summary -->
+      <div class="summary-row fade-up">
+        <div class="summary-item">
+          <div class="val" style="color:var(--income)">${fmtCurrency(income)}</div>
+          <div class="lbl">Total Income</div>
+        </div>
+        <div class="summary-item">
+          <div class="val" style="color:var(--expense)">${fmtCurrency(expense)}</div>
+          <div class="lbl">Total Expenses</div>
+        </div>
+        <div class="summary-item">
+          <div class="val" style="color:${balance>=0?'var(--income)':'var(--expense)'}">${savingsRate}%</div>
+          <div class="lbl">Savings Rate</div>
+        </div>
+      </div>
+
+      <!-- Charts row 1 -->
+      <div class="charts-2col fade-up delay-1">
+        <div class="chart-card">
+          <div class="chart-header"><div class="chart-title">Monthly Trend</div><div class="chart-sub">Income vs Expense — 6 months</div></div>
+          <div class="chart-body"><div class="chart-wrap"><canvas id="c-monthly"></canvas></div></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header"><div class="chart-title">Weekly Activity</div><div class="chart-sub">Last 8 weeks</div></div>
+          <div class="chart-body"><div class="chart-wrap"><canvas id="c-weekly"></canvas></div></div>
+        </div>
+      </div>
+
+      <!-- Charts row 2 -->
+      <div class="charts-2col fade-up delay-2">
+        <div class="chart-card">
+          <div class="chart-header"><div class="chart-title">Income by Category</div><div class="chart-sub">Breakdown</div></div>
+          <div class="chart-body"><div class="chart-wrap-sm"><canvas id="c-income-cat"></canvas></div></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-header"><div class="chart-title">Expense by Category</div><div class="chart-sub">Breakdown</div></div>
+          <div class="chart-body"><div class="chart-wrap-sm"><canvas id="c-expense-cat"></canvas></div></div>
+        </div>
+      </div>
+
+      <!-- Net balance chart -->
+      <div class="charts-1col chart-card fade-up delay-3">
+        <div class="chart-header"><div class="chart-title">Net Balance — Monthly</div><div class="chart-sub">Green = surplus, red = deficit</div></div>
+        <div class="chart-body"><div style="position:relative;height:170px"><canvas id="c-net"></canvas></div></div>
+      </div>`;
+
+    buildMonthly(all);
+    buildWeekly(all);
+    buildCat(all, 'income',  'c-income-cat');
+    buildCat(all, 'expense', 'c-expense-cat');
+    buildNet(all);
+  } catch(e) {
+    console.error(e); toast('Failed to load analytics', 'error');
+  }
+}
+
+// ── Chart builders ─────────────────────────────────────────────────────────
+const baseOpts = () => ({
+  responsive:true, maintainAspectRatio:false,
+  plugins:{
+    legend:{labels:{color:'#8891a8',font:{family:'DM Mono',size:11},boxWidth:10,padding:12}},
+    tooltip:{backgroundColor:'#0f1217',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,bodyColor:'#eaedf5',callbacks:{label:ctx=>` ${ctx.dataset?.label||ctx.label}: ${fmtCurrency(ctx.raw)}`}}
+  },
+  scales:{
+    x:{ticks:{color:'#50596e',font:{family:'DM Mono',size:10}},grid:{color:'rgba(255,255,255,0.03)'}},
+    y:{ticks:{color:'#50596e',font:{family:'DM Mono',size:10},callback:v=>'₹'+v.toLocaleString('en-IN')},grid:{color:'rgba(255,255,255,0.03)'},beginAtZero:true}
+  }
+});
+
+function getLast6Months() {
+  const d=new Date(); const m=[];
+  for(let i=5;i>=0;i--){const t=new Date(d.getFullYear(),d.getMonth()-i,1);m.push({key:`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}`,label:t.toLocaleString('default',{month:'short'})});}
+  return m;
+}
+
+function getLast8Weeks() {
+  const w=[]; const d=new Date();
+  for(let i=7;i>=0;i--){
+    const end=new Date(d); end.setDate(d.getDate()-i*7);
+    const start=new Date(end); start.setDate(end.getDate()-6);
+    w.push({start:start.toISOString().split('T')[0],end:end.toISOString().split('T')[0],label:`${start.getMonth()+1}/${start.getDate()}`});
+  }
+  return w;
+}
+
+function buildMonthly(all) {
+  const m=getLast6Months();
+  const inc=m.map(x=>all.filter(r=>r.entry_type==='income' &&r.date.startsWith(x.key)).reduce((s,r)=>s+ +r.amount,0));
+  const exp=m.map(x=>all.filter(r=>r.entry_type==='expense'&&r.date.startsWith(x.key)).reduce((s,r)=>s+ +r.amount,0));
+  new Chart(document.getElementById('c-monthly').getContext('2d'),{
+    type:'bar',
+    data:{labels:m.map(x=>x.label),datasets:[
+      {label:'Income', data:inc,backgroundColor:'rgba(94,234,212,0.65)',borderRadius:5,borderSkipped:false},
+      {label:'Expense',data:exp,backgroundColor:'rgba(248,113,113,0.65)',borderRadius:5,borderSkipped:false},
+    ]},options:baseOpts()
+  });
+}
+
+function buildWeekly(all) {
+  const w=getLast8Weeks();
+  const inc=w.map(x=>all.filter(r=>r.entry_type==='income' &&r.date>=x.start&&r.date<=x.end).reduce((s,r)=>s+ +r.amount,0));
+  const exp=w.map(x=>all.filter(r=>r.entry_type==='expense'&&r.date>=x.start&&r.date<=x.end).reduce((s,r)=>s+ +r.amount,0));
+  new Chart(document.getElementById('c-weekly').getContext('2d'),{
+    type:'line',
+    data:{labels:w.map(x=>x.label),datasets:[
+      {label:'Income', data:inc,borderColor:'#5eead4',backgroundColor:'rgba(94,234,212,0.08)',tension:0.4,fill:true,pointRadius:3,pointBackgroundColor:'#5eead4'},
+      {label:'Expense',data:exp,borderColor:'#f87171',backgroundColor:'rgba(248,113,113,0.08)',tension:0.4,fill:true,pointRadius:3,pointBackgroundColor:'#f87171'},
+    ]},options:baseOpts()
+  });
+}
+
+const palette=['#5eead4','#5eb8f5','#a78bfa','#fbbf24','#f87171','#34d399','#f472b6','#818cf8'];
+
+function buildCat(all,type,canvasId){
+  const cats={};
+  all.filter(r=>r.entry_type===type).forEach(r=>cats[r.category]=(cats[r.category]||0)+ +r.amount);
+  const entries=Object.entries(cats).sort((a,b)=>b[1]-a[1]);
+  if(!entries.length){document.getElementById(canvasId).closest('.chart-wrap-sm').innerHTML='<div class="empty-state" style="padding:20px"><div class="empty-sub">No data</div></div>';return;}
+  new Chart(document.getElementById(canvasId).getContext('2d'),{
+    type:'doughnut',
+    data:{labels:entries.map(e=>e[0]),datasets:[{data:entries.map(e=>e[1]),backgroundColor:palette,borderWidth:0,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',
+      plugins:{
+        legend:{position:'right',labels:{color:'#8891a8',font:{family:'DM Sans',size:11},boxWidth:10,padding:8}},
+        tooltip:{backgroundColor:'#0f1217',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,bodyColor:'#eaedf5',callbacks:{label:ctx=>` ${ctx.label}: ${fmtCurrency(ctx.raw)}`}}
+      }
+    }
+  });
+}
+
+function buildNet(all){
+  const m=getLast6Months();
+  const net=m.map(x=>{
+    const inc=all.filter(r=>r.entry_type==='income' &&r.date.startsWith(x.key)).reduce((s,r)=>s+ +r.amount,0);
+    const exp=all.filter(r=>r.entry_type==='expense'&&r.date.startsWith(x.key)).reduce((s,r)=>s+ +r.amount,0);
+    return inc-exp;
+  });
+  const opts=baseOpts();
+  opts.plugins.legend={display:false};
+  new Chart(document.getElementById('c-net').getContext('2d'),{
+    type:'bar',
+    data:{labels:m.map(x=>x.label),datasets:[{label:'Net',data:net,backgroundColor:net.map(v=>v>=0?'rgba(94,234,212,0.7)':'rgba(248,113,113,0.7)'),borderRadius:5,borderSkipped:false}]},
+    options:opts
+  });
+}
+</script>
+</body>
+</html>

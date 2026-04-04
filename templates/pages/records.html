@@ -1,0 +1,328 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinanceOS — Records</title>
+
+<link rel="stylesheet" href="{% static 'css/base.css' %}">
+
+<style>
+.filter-bar {
+  padding: 14px 20px;
+  display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
+  border-bottom: 1px solid var(--border);
+  background: rgba(22,27,36,0.6);
+}
+.filter-bar .form-input,
+.filter-bar .form-select {
+  background: var(--bg3); padding: 7px 12px;
+  font-size: 13px;
+}
+.filter-bar .form-input { flex: 1; min-width: 160px; }
+.filter-bar .form-select { min-width: 130px; }
+
+.action-cell { display: flex; gap: 6px; }
+.act-btn {
+  width: 30px; height: 30px;
+  border: 1px solid var(--border2); border-radius: var(--radius-xs);
+  background: var(--bg3); color: var(--text2);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+}
+.act-btn svg { width: 14px; height: 14px; }
+.act-btn.edit:hover   { border-color: var(--blue); color: var(--blue); background: rgba(94,184,245,0.08); }
+.act-btn.del:hover    { border-color: var(--red);  color: var(--red);  background: rgba(248,113,113,0.08); }
+</style>
+</head>
+<body>
+<div id="toast-container"></div>
+
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-area">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+
+      <!-- Table card -->
+      <div class="card">
+        <!-- Filter bar -->
+        <div class="filter-bar">
+          <input class="form-input" id="f-search" placeholder="🔍 Search description…" oninput="debouncedLoad()">
+          <select class="form-select" id="f-type" onchange="loadRecords()">
+            <option value="">All types</option>
+            <option value="income">Income</option>
+            <option value="expense">Expense</option>
+          </select>
+          <select class="form-select" id="f-cat" onchange="loadRecords()">
+            <option value="">All categories</option>
+            <option value="salary">Salary</option>
+            <option value="investment">Investment</option>
+            <option value="food">Food</option>
+            <option value="transport">Transport</option>
+            <option value="utilities">Utilities</option>
+            <option value="healthcare">Healthcare</option>
+            <option value="education">Education</option>
+            <option value="other">Other</option>
+          </select>
+          <input class="form-input form-input" type="date" id="f-from" onchange="loadRecords()" style="flex:unset;width:auto" title="From">
+          <input class="form-input" type="date" id="f-to"   onchange="loadRecords()" style="flex:unset;width:auto" title="To">
+        </div>
+
+        <!-- Table -->
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Type</th>
+                <th>Amount</th>
+                <th>Added by</th>
+                <th id="action-col" class="hidden">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="records-tbody">
+              <tr><td colspan="7" style="padding:32px;text-align:center;color:var(--text3)">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination" id="pagination" style="display:none">
+          <span id="pag-info"></span>
+          <div class="page-btns" id="pag-btns"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ── Add/Edit Modal ──────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="record-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modal-title">Add Record</div>
+      <button class="modal-close" onclick="closeModal('record-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="rec-id">
+      <div class="form-group">
+        <label class="form-label">Amount (₹)</label>
+        <input type="number" class="form-input" id="rec-amount" placeholder="0.00" min="0.01" step="0.01">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="form-group">
+          <label class="form-label">Type</label>
+          <select class="form-select" id="rec-type">
+            <option value="income">Income</option>
+            <option value="expense">Expense</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select class="form-select" id="rec-category">
+            <option value="salary">Salary</option>
+            <option value="investment">Investment</option>
+            <option value="food">Food</option>
+            <option value="transport">Transport</option>
+            <option value="utilities">Utilities</option>
+            <option value="healthcare">Healthcare</option>
+            <option value="education">Education</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input type="date" class="form-input" id="rec-date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Description</label>
+        <input type="text" class="form-input" id="rec-desc" placeholder="Optional note…">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('record-modal')">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveRecord()">Save Record</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Delete Modal ──────────────────────────────────────────────────────── -->
+<div class="modal-overlay" id="delete-modal" style="display:none">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <div class="modal-title">Delete Record?</div>
+      <button class="modal-close" onclick="closeModal('delete-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:14px;color:var(--text2);line-height:1.7">
+        This will soft-delete the record — it disappears from the dashboard but stays in the database for audit purposes.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary btn-sm" onclick="closeModal('delete-modal')">Cancel</button>
+      <button class="btn btn-danger btn-sm" onclick="confirmDelete()">Yes, Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- <script src="../js/api.js"></script> -->
+<script src="/static/js/api.js"></script>
+
+<script>
+if (!Auth.requireAuth()) throw '';
+
+const isAdmin = Auth.isAdmin();
+let currentPage = 1;
+let deleteId    = null;
+let allRecords  = []; // cached for edit
+
+// Show action col & add button for admin
+if (isAdmin) {
+  document.getElementById('action-col').classList.remove('hidden');
+  buildTopbar('Records', `
+    <button class="btn btn-primary btn-sm" onclick="openAdd()" style="gap:6px">
+      ${iconPlus()} Add Record
+    </button>`);
+} else {
+  buildTopbar('Records');
+}
+buildSidebar('records');
+
+const debouncedLoad = debounce(() => { currentPage = 1; loadRecords(); }, 380);
+
+async function loadRecords() {
+  const tbody = document.getElementById('records-tbody');
+  tbody.innerHTML = `<tr><td colspan="7" style="padding:32px;text-align:center;color:var(--text3)">Loading…</td></tr>`;
+
+  try {
+    const data = await API.get('/records/', {
+      search:     document.getElementById('f-search').value,
+      entry_type: document.getElementById('f-type').value,
+      category:   document.getElementById('f-cat').value,
+      date_from:  document.getElementById('f-from').value,
+      date_to:    document.getElementById('f-to').value,
+      page:       currentPage,
+      page_size:  15,
+    });
+
+    allRecords = data.results || [];
+    const total = data.count || 0;
+    const cols = isAdmin ? 7 : 6;
+
+    if (!allRecords.length) {
+      tbody.innerHTML = `<tr><td colspan="${cols}"><div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No records found</div><div class="empty-sub">Try adjusting your filters</div></div></td></tr>`;
+    } else {
+      tbody.innerHTML = allRecords.map(r => `
+        <tr class="fade-in">
+          <td class="mono primary">${r.date}</td>
+          <td style="max-width:180px" class="truncate">${r.description || '<span style="color:var(--text4)">—</span>'}</td>
+          <td><span class="category-pill">${r.category}</span></td>
+          <td><span class="tag tag-${r.entry_type}"><span class="tag-dot"></span>${r.entry_type}</span></td>
+          <td class="mono" style="color:${r.entry_type==='income'?'var(--income)':'var(--expense)'};font-weight:500">
+            ${r.entry_type==='income'?'+':'-'}${fmtCurrency(r.amount)}
+          </td>
+          <td style="color:var(--text3);font-size:12px">${r.created_by_username || '—'}</td>
+          ${isAdmin ? `<td><div class="action-cell">
+            <button class="act-btn edit" onclick="openEdit(${r.id})" title="Edit">${iconEdit()}</button>
+            <button class="act-btn del"  onclick="openDelete(${r.id})" title="Delete">${iconTrash()}</button>
+          </div></td>` : ''}
+        </tr>`).join('');
+    }
+
+    // Pagination
+    const totalPages = Math.ceil(total / 15);
+    const pag = document.getElementById('pagination');
+    if (totalPages > 1) {
+      pag.style.display = 'flex';
+      document.getElementById('pag-info').textContent =
+        `Showing ${(currentPage-1)*15+1}–${Math.min(currentPage*15,total)} of ${total}`;
+      const btns = document.getElementById('pag-btns');
+      btns.innerHTML = `
+        <button class="page-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹</button>
+        ${buildPageNums(currentPage, totalPages)}
+        <button class="page-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>›</button>`;
+    } else {
+      pag.style.display = 'none';
+    }
+  } catch(e) {
+    console.error(e); toast('Failed to load records', 'error');
+  }
+}
+
+function buildPageNums(cur, total) {
+  let pages = [];
+  for (let i = Math.max(1,cur-2); i <= Math.min(total,cur+2); i++) pages.push(i);
+  return pages.map(p => `<button class="page-btn ${p===cur?'active':''}" onclick="goPage(${p})">${p}</button>`).join('');
+}
+function goPage(p) { currentPage = p; loadRecords(); }
+
+// ── CRUD ──────────────────────────────────────────────────────────────────
+function openAdd() {
+  document.getElementById('modal-title').textContent = 'Add Record';
+  document.getElementById('rec-id').value = '';
+  document.getElementById('rec-amount').value = '';
+  document.getElementById('rec-type').value = 'income';
+  document.getElementById('rec-category').value = 'salary';
+  document.getElementById('rec-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('rec-desc').value = '';
+  openModal('record-modal');
+}
+
+function openEdit(id) {
+  const r = allRecords.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('modal-title').textContent = 'Edit Record';
+  document.getElementById('rec-id').value = r.id;
+  document.getElementById('rec-amount').value = r.amount;
+  document.getElementById('rec-type').value = r.entry_type;
+  document.getElementById('rec-category').value = r.category;
+  document.getElementById('rec-date').value = r.date;
+  document.getElementById('rec-desc').value = r.description || '';
+  openModal('record-modal');
+}
+
+async function saveRecord() {
+  const id   = document.getElementById('rec-id').value;
+  const body = {
+    amount:      document.getElementById('rec-amount').value,
+    entry_type:  document.getElementById('rec-type').value,
+    category:    document.getElementById('rec-category').value,
+    date:        document.getElementById('rec-date').value,
+    description: document.getElementById('rec-desc').value,
+  };
+  try {
+    if (id) { await API.patch(`/records/${id}/`, body); toast('Record updated', 'success'); }
+    else    { await API.post('/records/', body);         toast('Record created', 'success'); }
+    closeModal('record-modal');
+    loadRecords();
+  } catch(e) {
+    toast(Object.values(e).flat().join(' ') || 'Save failed', 'error');
+  }
+}
+
+function openDelete(id) { deleteId = id; openModal('delete-modal'); }
+async function confirmDelete() {
+  try {
+    await API.delete(`/records/${deleteId}/`);
+    toast('Record deleted', 'success');
+    closeModal('delete-modal');
+    loadRecords();
+  } catch(e) { toast('Delete failed', 'error'); }
+}
+
+// Keyboard shortcut
+document.addEventListener('keydown', e => {
+  if (e.key === 'n' && isAdmin && document.querySelectorAll('.modal-overlay[style*="flex"]').length === 0) openAdd();
+});
+
+loadRecords();
+</script>
+</body>
+</html>

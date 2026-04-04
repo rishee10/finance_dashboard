@@ -1,0 +1,156 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FinanceOS — Profile</title>
+
+<!-- <link rel="stylesheet" href="/static/css/base.css"> -->
+<!-- <link rel="stylesheet" href="/static/css/base.css"> -->
+
+<link rel="stylesheet" href="{% static 'css/base.css' %}">
+
+<style>
+.profile-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+@media(max-width:800px) { .profile-grid { grid-template-columns:1fr; } }
+
+.profile-card {
+  background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden;
+}
+.profile-hero {
+  padding:28px 26px;
+  display:flex; align-items:center; gap:18px;
+  border-bottom:1px solid var(--border);
+}
+.profile-avatar {
+  width: 64px; height: 64px; border-radius: 50%;
+  background: linear-gradient(135deg, var(--purple), var(--blue2));
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-head); font-weight: 800; font-size: 26px; color: #fff;
+  flex-shrink: 0; box-shadow: 0 0 0 3px rgba(167,139,250,0.2);
+}
+.profile-name   { font-family:var(--font-head); font-size:22px; font-weight:700; letter-spacing:-0.4px; }
+.profile-joined { font-size:12px; color:var(--text3); margin-top:5px; }
+
+.info-row {
+  padding:13px 26px; border-bottom:1px solid var(--border);
+  display:flex; justify-content:space-between; align-items:center;
+  font-size:13px;
+}
+.info-row:last-child { border-bottom:none; }
+.info-key { color:var(--text3); }
+.info-val { color:var(--text); font-family:var(--font-mono); font-size:12px; }
+
+.perm-row {
+  padding:12px 22px; border-bottom:1px solid var(--border);
+  display:flex; justify-content:space-between; align-items:center; font-size:13px;
+}
+.perm-row:last-child { border-bottom:none; }
+.perm-label { color:var(--text2); display:flex; align-items:center; gap:8px; }
+.perm-icon  { font-size:15px; }
+
+.allowed { color:var(--success); font-size:12px; font-weight:500; }
+.denied   { color:var(--text3);  font-size:12px; }
+</style>
+</head>
+<body>
+<div id="toast-container"></div>
+
+<div class="app-layout">
+  <aside class="sidebar" id="sidebar"></aside>
+  <div class="main-area">
+    <header class="topbar" id="topbar"></header>
+    <main class="page-content">
+      <div id="profile-content">
+        <div style="color:var(--text3)">Loading…</div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script src="/static/js/api.js"></script>
+<script>
+if (!Auth.requireAuth()) throw '';
+
+buildSidebar('profile');
+buildTopbar('My Profile', `
+  <button class="btn btn-secondary btn-sm" onclick="Auth.logout()">Sign Out</button>
+`);
+
+const user = Auth.getUser();
+
+const perms = [
+  { label: 'View financial records',   icon: '👁',  roles: ['viewer','analyst','admin'] },
+  { label: 'Search & filter records',  icon: '🔍',  roles: ['viewer','analyst','admin'] },
+  { label: 'Analytics dashboard',      icon: '📊',  roles: ['analyst','admin'] },
+  { label: 'Monthly & weekly trends',  icon: '📈',  roles: ['analyst','admin'] },
+  { label: 'Create financial records', icon: '✏️',  roles: ['admin'] },
+  { label: 'Edit financial records',   icon: '🔧',  roles: ['admin'] },
+  { label: 'Delete records (soft)',     icon: '🗑',  roles: ['admin'] },
+  { label: 'Manage users & roles',     icon: '👥',  roles: ['admin'] },
+];
+
+document.getElementById('profile-content').innerHTML = `
+  <div class="profile-grid fade-up">
+
+    <!-- Account info -->
+    <div class="profile-card">
+      <div class="profile-hero">
+        <div class="profile-avatar">${getInitials(user.username)}</div>
+        <div>
+          <div class="profile-name">${user.username}</div>
+          <div style="margin-top:6px"><span class="badge badge-${user.role}">${user.role}</span></div>
+          <div class="profile-joined">Member since ${new Date(user.date_joined).toLocaleDateString('en-IN',{year:'numeric',month:'long',day:'numeric'})}</div>
+        </div>
+      </div>
+      <div class="info-row"><span class="info-key">Username</span><span class="info-val">${user.username}</span></div>
+      <div class="info-row"><span class="info-key">Email</span><span class="info-val">${user.email || '—'}</span></div>
+      <div class="info-row"><span class="info-key">Role</span><span class="badge badge-${user.role}">${user.role}</span></div>
+      <div class="info-row"><span class="info-key">Status</span><span style="display:flex;align-items:center;gap:6px;font-size:12px"><span class="status-dot status-active"></span>Active</span></div>
+      <div class="info-row"><span class="info-key">User ID</span><span class="info-val">${user.id}</span></div>
+      <div style="padding:16px 26px">
+        <button class="btn btn-danger btn-full" onclick="Auth.logout()">Sign Out</button>
+      </div>
+    </div>
+
+    <!-- Permissions -->
+    <div class="profile-card">
+      <div style="padding:18px 22px 14px;border-bottom:1px solid var(--border)">
+        <div style="font-family:var(--font-head);font-size:14px;font-weight:600;margin-bottom:4px">Role Permissions</div>
+        <div style="font-size:12px;color:var(--text3)">What your <strong style="color:var(--text2)">${user.role}</strong> role can do</div>
+      </div>
+      ${perms.map(p => `
+        <div class="perm-row">
+          <span class="perm-label"><span class="perm-icon">${p.icon}</span>${p.label}</span>
+          ${p.roles.includes(user.role)
+            ? `<span class="allowed">✓ Allowed</span>`
+            : `<span class="denied">✕ Restricted</span>`}
+        </div>`).join('')}
+    </div>
+
+  </div>
+
+  <!-- Role comparison -->
+  <div class="profile-card fade-up delay-2" style="margin-top:16px">
+    <div style="padding:18px 22px 0;border-bottom:1px solid var(--border);padding-bottom:14px">
+      <div style="font-family:var(--font-head);font-size:14px;font-weight:600">All Role Capabilities</div>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Permission</th><th>Viewer</th><th>Analyst</th><th>Admin</th></tr></thead>
+        <tbody>
+          ${perms.map(p=>`
+            <tr>
+              <td>${p.icon} ${p.label}</td>
+              ${['viewer','analyst','admin'].map(r=>`<td>${p.roles.includes(r)?'<span class="allowed">✓</span>':'<span class="denied">—</span>'}</td>`).join('')}
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+`;
+</script>
+</body>
+</html>
