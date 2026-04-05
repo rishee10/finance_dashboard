@@ -16,7 +16,6 @@ Render: https://finance-dashboard-p74r.onrender.com/
 - [Local Setup](#local-setup)
 - [Frontend Pages](#frontend-pages)
 - [Deployment on Render](#deployment-on-render)
-- [Assumptions & Tradeoffs](#assumptions--tradeoffs)
 
 ---
 
@@ -377,10 +376,3 @@ SQLite requires zero configuration and works immediately. Switching to PostgreSQ
 
 ---
 
-## Assumptions & Tradeoffs
-
-- Role assignment is open during registration for demonstration purposes. In a real production system, only admins would be able to assign the `admin` or `analyst` roles.
-- SQLite is used for local development. Render's free tier does not persist SQLite data between deploys — use PostgreSQL (via `dj-database-url`) for persistent production data.
-- Pagination is set to 20 records per page by default, configurable via `page_size` query parameter.
-- The `is_deleted` flag is never exposed as a writable field from the API — it can only be set by the DELETE endpoint.
-- Token refresh is the client's responsibility. Access tokens expire after 8 hours; refresh tokens after 7 days.
