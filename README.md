@@ -14,7 +14,6 @@ A production-ready, role-based financial records management system built with **
 - [Local Setup](#local-setup)
 - [Frontend Pages](#frontend-pages)
 - [Deployment on Render](#deployment-on-render)
-- [Design Decisions](#design-decisions)
 - [Assumptions & Tradeoffs](#assumptions--tradeoffs)
 
 ---
@@ -146,8 +145,8 @@ Base URL: `http://127.0.0.1:8000/api/v1/`
 **Register request body:**
 ```json
 {
-  "username": "john",
-  "email": "john@example.com",
+  "username": "user1",
+  "email": "user1@example.com",
   "password": "StrongPass123!",
   "password2": "StrongPass123!",
   "role": "viewer"
@@ -157,7 +156,7 @@ Base URL: `http://127.0.0.1:8000/api/v1/`
 **Login request body:**
 ```json
 {
-  "username": "john",
+  "username": "user1",
   "password": "StrongPass123!"
 }
 ```
@@ -165,7 +164,7 @@ Base URL: `http://127.0.0.1:8000/api/v1/`
 **Login response:**
 ```json
 {
-  "user": { "id": 1, "username": "john", "role": "viewer" },
+  "user": { "id": 1, "username": "user1", "role": "viewer" },
   "tokens": {
     "access": "eyJ...",
     "refresh": "eyJ..."
@@ -269,29 +268,14 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Create `.env` file
-
-Create a file named `.env` in the project root (same folder as `manage.py`):
-
-```env
-SECRET_KEY=your-very-long-random-secret-key-here
-DEBUG=True
-ALLOWED_HOSTS=127.0.0.1,localhost
-```
-
-To generate a strong secret key:
-```bash
-python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"
-```
-
-### 4. Run migrations
+### 3. Run migrations
 
 ```bash
 python manage.py makemigrations api
 python manage.py migrate
 ```
 
-### 5. Create test users
+### 4. Create test users
 
 ```bash
 python manage.py shell
@@ -321,13 +305,13 @@ u.save()
 exit()
 ```
 
-### 6. Collect static files
+### 5. Collect static files
 
 ```bash
 python manage.py collectstatic --noinput
 ```
 
-### 7. Run the server
+### 6. Run the server
 
 ```bash
 python manage.py runserver
@@ -335,7 +319,7 @@ python manage.py runserver
 
 Open `http://127.0.0.1:8000/` in your browser.
 
-### 8. Run tests
+### 7. Run tests
 
 ```bash
 python manage.py test api --verbosity=2
@@ -374,77 +358,7 @@ The frontend is a multi-page application served directly by Django. No separate 
 
 ## Deployment on Render
 
-### Files needed for Render
-
-The following files are already included in the project:
-
-**`requirements.txt`** — all Python dependencies including `gunicorn` and `whitenoise`
-
-**`build.sh`** — runs on every deploy:
-```bash
-#!/bin/bash
-pip install -r requirements.txt
-python manage.py collectstatic --noinput
-python manage.py migrate
-```
-
-**`render.yaml`** — tells Render how to run the app:
-```yaml
-services:
-  - type: web
-    name: financeos
-    env: python
-    buildCommand: "./build.sh"
-    startCommand: "gunicorn finance_dashboard.wsgi:application"
-```
-
-### Step-by-step Render deployment
-
-**Step 1 — Push to GitHub**
-
-Make sure your `.gitignore` excludes secrets (see below). Then:
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/yourusername/finance-dashboard.git
-git push -u origin main
-```
-
-**Step 2 — Create a Render account**
-
-Go to [render.com](https://render.com) and sign up with GitHub.
-
-**Step 3 — Create a new Web Service**
-
-- Click **New → Web Service**
-- Connect your GitHub repository
-- Render auto-detects the `render.yaml`
-
-**Step 4 — Set environment variables in Render dashboard**
-
-Go to your service → **Environment** → add these:
-
-| Key | Value |
-|-----|-------|
-| `SECRET_KEY` | your long random secret key |
-| `DEBUG` | `False` |
-| `ALLOWED_HOSTS` | `yourappname.onrender.com` |
-| `PYTHON_VERSION` | `3.11.0` |
-
-**Step 5 — Deploy**
-
-Click **Deploy**. Render runs `build.sh` then starts gunicorn. Your app will be live at `https://yourappname.onrender.com`.
-
-**Step 6 — Create admin user on Render**
-
-In the Render dashboard → your service → **Shell**:
-```bash
-python manage.py createsuperuser
-```
-
----
+Link: https://finance-dashboard-p74r.onrender.com/
 
 ## Design Decisions
 
