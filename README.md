@@ -60,7 +60,6 @@ finance_dashboard/               ← project root
 │
 ├── manage.py
 ├── requirements.txt
-├── .env                         ← secret keys (not in GitHub)
 ├── .gitignore
 ├── build.sh                     ← Render build script
 ├── render.yaml                  ← Render deployment config
@@ -77,7 +76,6 @@ finance_dashboard/               ← project root
 │   ├── permissions.py           ← IsAdminRole, IsAnalystOrAbove, IsViewerOrAbove
 │   ├── filters.py               ← FinancialRecordFilter (date, type, category, amount)
 │   ├── admin.py                 ← Django admin registration
-│   ├── tests.py                 ← auth + record + dashboard tests
 │   ├── urls.py                  ← API URL patterns
 │   └── views/
 │       ├── __init__.py
@@ -145,8 +143,8 @@ Base URL: `http://127.0.0.1:8000/api/v1/`
 **Register request body:**
 ```json
 {
-  "username": "user1",
-  "email": "user1@example.com",
+  "username": "Rishee",
+  "email": "Rishee1@example.com",
   "password": "StrongPass123!",
   "password2": "StrongPass123!",
   "role": "viewer"
@@ -156,7 +154,7 @@ Base URL: `http://127.0.0.1:8000/api/v1/`
 **Login request body:**
 ```json
 {
-  "username": "user1",
+  "username": "Rishee",
   "password": "StrongPass123!"
 }
 ```
@@ -164,7 +162,7 @@ Base URL: `http://127.0.0.1:8000/api/v1/`
 **Login response:**
 ```json
 {
-  "user": { "id": 1, "username": "user1", "role": "viewer" },
+  "user": { "id": 1, "username": "Rishee", "role": "viewer" },
   "tokens": {
     "access": "eyJ...",
     "refresh": "eyJ..."
@@ -319,11 +317,6 @@ python manage.py runserver
 
 Open `http://127.0.0.1:8000/` in your browser.
 
-### 7. Run tests
-
-```bash
-python manage.py test api --verbosity=2
-```
 
 ---
 
